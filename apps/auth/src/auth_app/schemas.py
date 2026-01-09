@@ -43,6 +43,30 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class UserCreate(BaseModel):
+    """Request schema for creating a new user."""
+
+    nome: str
+    email: EmailStr
+    password: Optional[str] = None  # Optional - if None, generates automatically
+    role: str = "vendedor"  # admin or vendedor
+
+
+class UserCreatedResponse(BaseModel):
+    """Response schema for user creation."""
+
+    id: UUID
+    tenant_id: UUID
+    nome: str
+    email: str
+    role: str
+    ativo: bool
+    password: Optional[str] = None  # Only present if password was auto-generated
+
+    class Config:
+        from_attributes = True
+
+
 # =============================================================================
 # Tenant Schemas
 # =============================================================================

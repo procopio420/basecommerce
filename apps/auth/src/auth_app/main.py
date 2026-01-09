@@ -18,7 +18,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from basecore.logging import setup_logging
-from basecore.security import create_access_token, verify_password
+from basecore.security import create_access_token, get_password_hash, verify_password
 from basecore.settings import get_settings
 
 from auth_app.deps import (
@@ -28,6 +28,7 @@ from auth_app.deps import (
     get_tenant_by_slug,
     get_tenant_from_header,
     get_tenant_slug_from_header,
+    require_admin_user,
     require_current_user,
 )
 from auth_app.models import Tenant, TenantBranding, User
@@ -35,8 +36,11 @@ from auth_app.schemas import (
     LoginRequest,
     TenantResponse,
     TokenResponse,
+    UserCreate,
+    UserCreatedResponse,
     UserResponse,
 )
+from auth_app.utils import generate_random_password
 
 setup_logging()
 settings = get_settings()
@@ -328,3 +332,86 @@ async def validate_token(user: Optional[User] = Depends(get_current_user)):
         "email": user.email,
         "role": user.role,
     }
+
+
+# =============================================================================
+# User Management Endpoint
+# =============================================================================
+
+
+@app.post("/users", response_model=UserCreatedResponse, status_code=status.HTTP_201_CREATED)
+async def create_user(
+    user_create: UserCreate,
+    current_user: User = Depends(require_admin_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Create a new user for the current tenant.
+    
+    Requires:
+    - Authentication (JWT token)
+    - Admin role in the tenant
+    
+    Validates:
+    - Email is unique within the tenant
+    - Role is valid (admin or vendedor)
+    - Tenant exists and is active
+    
+    If password is not provided, generates a random password automatically.
+    """
+    # Validate role
+    if user_create.role not in ["admin", "vendedor"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid role. Must be 'admin' or 'vendedor'",
+        )
+
+    # Verify tenant is active (already verified by require_admin_user)
+    tenant_id = current_user.tenant_id
+
+    # Check if email already exists in this tenant
+    existing_user = (
+        db.query(User)
+        .filter(
+            User.email == user_create.email,
+            User.tenant_id == tenant_id,
+        )
+        .first()
+    )
+
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"User with email '{user_create.email}' already exists in this tenant",
+        )
+
+    # Generate password if not provided
+    password = user_create.password or generate_random_password()
+    password_hash = get_password_hash(password)
+
+    # Create user
+    new_user = User(
+        tenant_id=tenant_id,
+        nome=user_create.nome,
+        email=user_create.email,
+        password_hash=password_hash,
+        role=user_create.role,
+        ativo=True,
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    # Prepare response - include password only if it was auto-generated
+    response_data = {
+        "id": new_user.id,
+        "tenant_id": new_user.tenant_id,
+        "nome": new_user.nome,
+        "email": new_user.email,
+        "role": new_user.role,
+        "ativo": new_user.ativo,
+        "password": None if user_create.password else password,
+    }
+
+    return UserCreatedResponse(**response_data)

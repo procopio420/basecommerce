@@ -4,7 +4,7 @@ import sys
 
 import typer
 
-from basec import compose, deploy, firewall, logs, migrate, rollback, smoke, ssh_cmd, ssl, status, tenants
+from basec import compose, deploy, firewall, logs, migrate, redeploy, rollback, smoke, ssh_cmd, ssl, status, tenants, users
 
 app = typer.Typer(
     name="basec",
@@ -37,8 +37,10 @@ def smoke_wrapper(
 app.command(name="smoke")(smoke_wrapper)
 app.command(name="logs")(logs.logs_command)  # Direct command, not subcommand
 app.command(name="deploy")(deploy.deploy)  # Direct command, not subcommand
+app.command(name="redeploy")(redeploy.redeploy)  # Direct command, not subcommand
 app.command(name="rollback")(rollback.rollback)  # Direct command, not subcommand
 app.add_typer(tenants.app, name="tenants")
+app.add_typer(users.app, name="users")
 app.add_typer(ssh_cmd.app, name="ssh")
 app.add_typer(migrate.app, name="migrate")
 app.add_typer(compose.app, name="compose")

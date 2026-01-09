@@ -72,8 +72,11 @@ docker compose up -d
 Use `basec` CLI for operations:
 
 ```bash
-# Deploy
+# Deploy (atualização normal)
 basec deploy edge
+
+# Redeploy completo do zero (atualiza tudo)
+basec redeploy edge --force
 
 # SSL Certificate Management
 basec ssl check edge          # Verificar status dos certificados
@@ -88,9 +91,15 @@ basec status
 
 # SSH
 basec ssh edge
+
+# Smoke tests
+basec smoke edge
 ```
 
-**Nota**: O comando `deploy` agora verifica automaticamente os certificados SSL e mostra avisos se estiverem faltando.
+**Notas:**
+- O comando `deploy` verifica automaticamente os certificados SSL e mostra avisos se estiverem faltando.
+- Use `redeploy` quando precisar garantir que todos os arquivos estão atualizados (especialmente nginx config).
+- Veja [Redeploy Guide](../../docs/redeploy-guide.md) para instruções completas.
 
 ## Configuration Files
 
