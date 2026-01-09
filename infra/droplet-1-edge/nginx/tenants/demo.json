@@ -1,0 +1,20 @@
+{
+  "slug": "demo",
+  "name": "Demo Store",
+  "theme": {
+    "primaryColor": "#059669",
+    "secondaryColor": "#047857",
+    "logoUrl": null
+  },
+  "features": {
+    "cotacoes": true,
+    "pedidos": true,
+    "estoque": true,
+    "fornecedores": true
+  },
+  "contact": {
+    "email": "demo@basecommerce.com.br",
+    "phone": null
+  }
+}
+

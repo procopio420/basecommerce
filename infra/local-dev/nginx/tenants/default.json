@@ -1,0 +1,16 @@
+{
+  "slug": "",
+  "name": "Local Development",
+  "theme": {
+    "primaryColor": "#2563eb",
+    "secondaryColor": "#1e40af",
+    "logoUrl": null
+  },
+  "features": {
+    "cotacoes": true,
+    "pedidos": true,
+    "estoque": true,
+    "fornecedores": true
+  }
+}
+

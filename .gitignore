@@ -6,6 +6,7 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
 ENV/
 build/
 develop-eggs/
@@ -27,7 +28,13 @@ wheels/
 .coverage
 htmlcov/
 
-# Node
+# Ruff
+.ruff_cache/
+
+# Mypy
+.mypy_cache/
+
+# Node (legacy - not used)
 node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -59,3 +66,15 @@ build/
 *.db
 *.sqlite
 
+# Logs
+logs/
+*.log
+
+# Alembic
+alembic/versions/__pycache__/
+
+# Docker
+.docker/
+
+# Cursor
+.cursor/

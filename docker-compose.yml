@@ -1,18 +1,27 @@
-version: '3.8'
+# BaseCommerce - Root Docker Compose
+# 
+# For local development, use the dedicated local-dev environment:
+#   cd infra/local-dev && docker compose up -d
+#
+# This file is kept for backward compatibility and quick testing.
 
 services:
+  # =============================================================================
+  # Infrastructure
+  # =============================================================================
+  
   db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     environment:
-      POSTGRES_USER: construcao_user
-      POSTGRES_PASSWORD: construcao_pass
-      POSTGRES_DB: construcao_db
+      POSTGRES_USER: basecommerce
+      POSTGRES_PASSWORD: localdev123
+      POSTGRES_DB: basecommerce
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U construcao_user -d construcao_db"]
+      test: ["CMD-SHELL", "pg_isready -U basecommerce"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -21,30 +30,72 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  backend:
-    build: ./backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+  # =============================================================================
+  # Nginx Reverse Proxy (Multi-tenant routing)
+  # =============================================================================
+  
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
     volumes:
-      - ./backend:/app
+      - ./infra/local-dev/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/local-dev/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./infra/local-dev/nginx/tenants:/etc/nginx/tenants:ro
+    depends_on:
+      construction:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # =============================================================================
+  # Auth Service
+  # =============================================================================
+
+  auth:
+    build:
+      context: .
+      dockerfile: apps/auth/Dockerfile
+    environment:
+      SECRET_KEY: local-dev-secret-key
+      ENVIRONMENT: development
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # Verticals
+  # =============================================================================
+  
+  construction:
+    build:
+      context: .
+      dockerfile: apps/verticals/construction/Dockerfile
+    command: uvicorn construction_app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./apps/verticals/construction/src:/app/src
       - ./packages:/app/packages
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://construcao_user:construcao_pass@db:5432/construcao_db
-      SECRET_KEY: change-this-secret-key-in-production
-      ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
-      CORS_ORIGINS: http://localhost:5173,http://localhost:3000
+      DATABASE_URL: postgresql://basecommerce:localdev123@db:5432/basecommerce
+      SECRET_KEY: local-dev-secret-key
+      ENVIRONMENT: development
+      DEBUG: "true"
+      CORS_ORIGINS: "*"
       REDIS_URL: redis://redis:6379/0
+      PYTHONPATH: /app/src
     depends_on:
       db:
         condition: service_healthy
@@ -56,16 +107,19 @@ services:
       timeout: 10s
       retries: 3
 
+  # =============================================================================
+  # Event Infrastructure
+  # =============================================================================
+  
   outbox-relay:
     build:
       context: .
       dockerfile: apps/outbox-relay/Dockerfile
     environment:
-      DATABASE_URL: postgresql://construcao_user:construcao_pass@db:5432/construcao_db
+      DATABASE_URL: postgresql://basecommerce:localdev123@db:5432/basecommerce
       REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: change-this-secret-key-in-production
-      RELAY_BATCH_SIZE: 100
-      RELAY_POLL_INTERVAL_EMPTY: 5
+      POLL_INTERVAL_MS: 500
+      BATCH_SIZE: 50
     depends_on:
       db:
         condition: service_healthy
@@ -73,17 +127,19 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # =============================================================================
+  # Horizontal Engines
+  # =============================================================================
+  
   engines-worker:
     build:
       context: .
       dockerfile: apps/engines/Dockerfile
     environment:
-      DATABASE_URL: postgresql://construcao_user:construcao_pass@db:5432/construcao_db
+      DATABASE_URL: postgresql://basecommerce:localdev123@db:5432/basecommerce
       REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: change-this-secret-key-in-production
-      ENGINES_STREAM_NAME: events:materials
-      ENGINES_GROUP_NAME: engines
-      ENGINES_BATCH_SIZE: 10
+      CONSUMER_GROUP: engines-local
+      CONSUMER_NAME: worker-local
     depends_on:
       db:
         condition: service_healthy
@@ -91,19 +147,5 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  frontend:
-    build: ./frontend
-    command: npm run dev -- --host
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    ports:
-      - "5173:5173"
-    environment:
-      VITE_API_URL: http://localhost:8000
-    depends_on:
-      - backend
-
 volumes:
   postgres_data:
-  redis_data:

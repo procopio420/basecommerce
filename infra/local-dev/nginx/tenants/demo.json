@@ -1,0 +1,16 @@
+{
+  "slug": "demo",
+  "name": "Demo Tenant",
+  "theme": {
+    "primaryColor": "#059669",
+    "secondaryColor": "#047857",
+    "logoUrl": null
+  },
+  "features": {
+    "cotacoes": true,
+    "pedidos": true,
+    "estoque": true,
+    "fornecedores": true
+  }
+}
+

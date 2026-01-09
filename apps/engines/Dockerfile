@@ -28,6 +28,6 @@ RUN pip install --no-cache-dir -e .
 WORKDIR /app
 RUN pip install --no-cache-dir pydantic-settings redis
 
-# NOTE: No backend/ code is copied - engines are fully independent
+# NOTE: No construction-backend/ code is copied - engines are fully independent
 
 CMD ["python", "-m", "engines_worker.main"]

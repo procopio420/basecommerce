@@ -1,0 +1,162 @@
+# Local Development Environment
+# Simulates the 3-droplet production setup in a single compose file
+#
+# Usage:
+#   docker compose up -d
+#   ./smoke-test.sh
+#
+# Access:
+#   - Web: http://demo.localhost/web/dashboard
+#   - API: http://demo.localhost/api/v1/...
+#   - Docs: http://localhost/docs
+
+services:
+  # ==========================================================================
+  # DROPLET 3 - Infrastructure Services
+  # ==========================================================================
+  
+  postgres:
+    image: postgres:16-alpine
+    container_name: local-postgres
+    environment:
+      POSTGRES_USER: basecommerce
+      POSTGRES_PASSWORD: localdev123
+      POSTGRES_DB: basecommerce
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U basecommerce"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - basecommerce-local
+
+  redis:
+    image: redis:7-alpine
+    container_name: local-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - basecommerce-local
+
+  outbox-relay:
+    build:
+      context: ../../
+      dockerfile: apps/outbox-relay/Dockerfile
+    container_name: local-outbox-relay
+    environment:
+      DATABASE_URL: postgresql://basecommerce:localdev123@postgres:5432/basecommerce
+      REDIS_URL: redis://redis:6379/0
+      POLL_INTERVAL_MS: 500
+      BATCH_SIZE: 50
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - basecommerce-local
+
+  engines-worker:
+    build:
+      context: ../../
+      dockerfile: apps/engines/Dockerfile
+    container_name: local-engines-worker
+    environment:
+      DATABASE_URL: postgresql://basecommerce:localdev123@postgres:5432/basecommerce
+      REDIS_URL: redis://redis:6379/0
+      CONSUMER_GROUP: engines-local
+      CONSUMER_NAME: worker-local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - basecommerce-local
+
+  # ==========================================================================
+  # DROPLET 2 - Construction Vertical
+  # ==========================================================================
+  
+  construction:
+    build:
+      context: ../../
+      dockerfile: apps/verticals/construction/Dockerfile
+    container_name: local-construction
+    environment:
+      DATABASE_URL: postgresql://basecommerce:localdev123@postgres:5432/basecommerce
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: local-dev-secret-key-not-for-production
+      ENVIRONMENT: development
+      DEBUG: "true"
+      CORS_ORIGINS: "*"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - basecommerce-local
+
+  # ==========================================================================
+  # DROPLET 1 - Edge Services
+  # ==========================================================================
+  
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: local-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/tenants:/etc/nginx/tenants:ro
+    depends_on:
+      construction:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    networks:
+      - basecommerce-local
+
+  auth:
+    build:
+      context: ../../
+      dockerfile: apps/auth/Dockerfile
+    container_name: local-auth
+    environment:
+      SECRET_KEY: local-dev-secret-key-not-for-production
+      ENVIRONMENT: development
+    expose:
+      - "8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - basecommerce-local
+
+volumes:
+  postgres_data:
+
+networks:
+  basecommerce-local:
+    driver: bridge
+

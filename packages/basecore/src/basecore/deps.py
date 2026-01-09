@@ -1,22 +1,43 @@
+"""
+Shared dependencies for FastAPI applications.
+
+NOTE: This module provides BASE dependencies that can be used by any vertical.
+For dependencies that require vertical-specific models (like User), 
+each vertical should define its own deps module that imports and extends these.
+
+Example usage in a vertical:
+    from basecore.deps import decode_token_payload
+    
+    # Then define vertical-specific user loading
+    async def get_current_user(...):
+        payload = decode_token_payload(token)
+        # Load user from vertical's own User model
+        ...
+"""
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
 
-from basecore.db import get_db
 from basecore.security import decode_access_token
-
-# Import User model - services will have app/ available
-from app.models.user import User  # noqa: E402
 
 security = HTTPBearer()
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)
-) -> User:
+def decode_token_payload(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
     """
-    Dependency para obter o usuário atual através do token JWT.
-    Extrai o tenant_id do token para garantir isolamento multi-tenant.
+    Decode JWT token and return payload.
+    
+    This is a base dependency that can be used by verticals.
+    Each vertical should implement its own get_current_user that
+    loads the user from the vertical's User model.
+    
+    Returns:
+        dict with at least 'sub' (user_id) and 'tenant_id'
+    
+    Raises:
+        HTTPException 401 if token is invalid
     """
     token = credentials.credentials
     payload = decode_access_token(token)
@@ -38,38 +59,4 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user = (
-        db.query(User)
-        .filter(User.id == user_id, User.tenant_id == tenant_id, User.ativo is True)
-        .first()
-    )
-
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário não encontrado ou inativo",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    return user
-
-
-async def get_tenant_id(current_user: User = Depends(get_current_user)) -> str:
-    """Dependency para garantir que todas as queries tenham tenant_id."""
-    return str(current_user.tenant_id)
-
-
-async def require_admin_role(current_user: User = Depends(get_current_user)) -> User:
-    """
-    Dependency para garantir que apenas admins podem acessar endpoints.
-    Levanta HTTPException 403 se usuário não for admin.
-
-    Usado em endpoints dos engines (/api/v1/engines/*) que requerem acesso administrativo.
-    """
-    if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado. Apenas administradores podem acessar este recurso.",
-        )
-    return current_user
-
+    return payload
