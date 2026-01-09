@@ -4,6 +4,34 @@
 
 **Subdomain-based multi-tenancy** com dados isolados por `tenant_id` em todas as tabelas.
 
+## Arquitetura Centralizada
+
+O Auth Service e o owner dos modelos de Tenant, User e TenantBranding. Os verticais (ex: Construction) nao tem esses modelos - usam apenas os claims do JWT.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Auth Service                             │
+│                                                                  │
+│  Modelos:                      Endpoints:                        │
+│  - Tenant                      - /auth/login                     │
+│  - User                        - /tenant.json                    │
+│  - TenantBranding              - /auth/me                        │
+└─────────────────────────────────────────────────────────────────┘
+                                 │
+                                 │ JWT com claims:
+                                 │ - sub (user_id)
+                                 │ - tenant_id
+                                 │ - email
+                                 │ - role
+                                 ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         Vertical                                 │
+│                                                                  │
+│  Extrai UserClaims do JWT (sem query ao banco)                   │
+│  Todas as queries usam tenant_id do JWT                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ## Fluxo de Resolucao
 
 ```
@@ -16,16 +44,19 @@
 3. Nginx injeta header: X-Tenant-Slug: lojadoze
                               │
                               ▼
-4. Backend middleware le header (ou Host em dev)
+4. Se nao autenticado, redireciona para /auth/login
                               │
                               ▼
-5. Middleware busca tenant no banco por slug
+5. Auth Service busca tenant no banco por slug
                               │
                               ▼
-6. request.state.tenant_id = tenant.id
+6. Auth Service cria JWT com tenant_id nos claims
                               │
                               ▼
-7. Todas as queries filtram por tenant_id
+7. Vertical extrai tenant_id do JWT
+                              │
+                              ▼
+8. Todas as queries filtram por tenant_id
 ```
 
 ## Configuracao Nginx
@@ -42,33 +73,89 @@ server {
     listen 80;
     server_name *.basecommerce.com.br *.localhost localhost;
     
+    # Tenant JSON servido pelo Auth Service
+    location = /tenant.json {
+        proxy_pass http://auth_service/tenant.json;
+        proxy_set_header X-Tenant-Slug $tenant_slug;
+    }
+    
+    # Login redireciona para Auth Service
+    location = /web/login {
+        return 302 /auth/login;
+    }
+    
+    # Auth endpoints
+    location /auth/ {
+        proxy_pass http://auth_service/;
+        proxy_set_header X-Tenant-Slug $tenant_slug;
+    }
+    
+    # Vertical
     location / {
         proxy_pass http://construction:8000;
-        proxy_set_header Host $host;
         proxy_set_header X-Tenant-Slug $tenant_slug;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 }
 ```
 
-## Middleware Python
+## JWT Claims
+
+O JWT gerado pelo Auth Service contem:
+
+```json
+{
+  "sub": "user-uuid",
+  "tenant_id": "tenant-uuid",
+  "email": "user@example.com",
+  "role": "admin",
+  "exp": 1234567890
+}
+```
+
+## UserClaims no Vertical
+
+O vertical extrai os claims do JWT sem fazer query ao banco:
 
 ```python
-def get_tenant_slug_from_request(request: Request) -> str | None:
-    # Prioridade 1: Header X-Tenant-Slug (producao, via Nginx)
-    tenant_slug = request.headers.get("x-tenant-slug", "").strip()
-    if tenant_slug:
-        return tenant_slug
+@dataclass
+class UserClaims:
+    id: UUID
+    tenant_id: UUID
+    email: str
+    role: str
+
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials) -> UserClaims:
+    token = credentials.credentials
+    payload = decode_access_token(token)
     
-    # Prioridade 2: Parse do Host (desenvolvimento local)
-    host = request.headers.get("host", "")
-    return extract_slug_from_host(host)
+    return UserClaims(
+        id=UUID(payload["sub"]),
+        tenant_id=UUID(payload["tenant_id"]),
+        email=payload["email"],
+        role=payload["role"],
+    )
 ```
 
 ## Tenant Branding
 
-Cada tenant pode ter branding personalizado:
+O branding e servido dinamicamente pelo Auth Service via `/tenant.json`:
+
+```json
+{
+  "slug": "lojadoze",
+  "name": "Loja do Zé",
+  "logo_url": "https://...",
+  "primary_color": "#1a73e8",
+  "secondary_color": "#ea4335",
+  "features": {
+    "cotacoes": true,
+    "pedidos": true
+  }
+}
+```
+
+A configuracao e armazenada no banco:
 
 ```sql
 CREATE TABLE tenant_branding (
@@ -80,35 +167,29 @@ CREATE TABLE tenant_branding (
 );
 ```
 
-O branding e injetado no contexto dos templates Jinja2:
-
-```python
-context = {
-    "tenant_name": tenant.nome,
-    "branding": {
-        "primary_color": branding.primary_color,
-        "logo_url": branding.logo_url,
-    }
-}
-```
-
 ## Desenvolvimento Local
 
 ### Sem Subdomain
 
-Acesse diretamente `http://localhost:8000/web/login`.
+Acesse diretamente `http://localhost:8000/web/dashboard`.
 O sistema funciona sem tenant especifico (modo desenvolvimento).
 
 ### Com Subdomain
 
 1. Adicione ao `/etc/hosts`:
 ```
-127.0.0.1 exemplo.localhost
+127.0.0.1 demo.localhost
 ```
 
-2. Acesse: `http://exemplo.localhost:8000/web/login`
+2. Inicie os servicos:
+```bash
+cd infra/local-dev
+docker compose up -d
+```
 
-O middleware resolve `exemplo` como slug e busca o tenant no banco.
+3. Acesse: `http://demo.localhost/auth/login`
+
+O middleware resolve `demo` como slug via header X-Tenant-Slug.
 
 ## Isolamento de Dados
 
@@ -117,7 +198,7 @@ O middleware resolve `exemplo` como slug e busca o tenant no banco.
 ```python
 cotacoes = (
     db.query(Cotacao)
-    .filter(Cotacao.tenant_id == tenant_id)  # OBRIGATORIO
+    .filter(Cotacao.tenant_id == user.tenant_id)  # Do JWT claims
     .order_by(Cotacao.created_at.desc())
     .all()
 )
@@ -136,7 +217,12 @@ envelope = EventEnvelope(
 
 ## Criacao de Novo Tenant
 
+A criacao de tenant e feita diretamente no banco (ou futuramente via admin panel no Auth Service):
+
 ```python
+from auth_app.models import Tenant, TenantBranding, User
+from basecore.security import get_password_hash
+
 # 1. Criar tenant
 tenant = Tenant(
     nome="Nova Loja",
@@ -170,4 +256,3 @@ db.commit()
 ```
 
 Apos isso, o tenant pode acessar via `novaloja.basecommerce.com.br`.
-

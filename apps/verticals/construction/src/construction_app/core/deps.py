@@ -1,20 +1,36 @@
+"""API dependencies for Bearer token authentication."""
+
+from dataclasses import dataclass
+from typing import Optional
+from uuid import UUID
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
 
-from construction_app.core.database import get_db
 from construction_app.core.security import decode_access_token
-from construction_app.models.user import User
 
 security = HTTPBearer()
 
 
+@dataclass
+class UserClaims:
+    """User information extracted from JWT token.
+    
+    This replaces the User model for authentication purposes.
+    User data is stored in auth service, vertical only needs claims.
+    """
+    id: UUID
+    tenant_id: UUID
+    email: str
+    role: str
+
+
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)
-) -> User:
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> UserClaims:
     """
     Dependency para obter o usuário atual através do token JWT.
-    Extrai o tenant_id do token para garantir isolamento multi-tenant.
+    Extrai claims do token sem query ao banco.
     """
     token = credentials.credentials
     payload = decode_access_token(token)
@@ -26,38 +42,32 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_id: str | None = payload.get("sub")
-    tenant_id: str | None = payload.get("tenant_id")
+    user_id: Optional[str] = payload.get("sub")
+    tenant_id: Optional[str] = payload.get("tenant_id")
+    email: Optional[str] = payload.get("email")
+    role: Optional[str] = payload.get("role", "vendedor")
 
-    if user_id is None or tenant_id is None:
+    if not user_id or not tenant_id or not email:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user = (
-        db.query(User)
-        .filter(User.id == user_id, User.tenant_id == tenant_id, User.ativo is True)
-        .first()
+    return UserClaims(
+        id=UUID(user_id),
+        tenant_id=UUID(tenant_id),
+        email=email,
+        role=role,
     )
 
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário não encontrado ou inativo",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
 
-    return user
-
-
-async def get_tenant_id(current_user: User = Depends(get_current_user)) -> str:
+async def get_tenant_id(current_user: UserClaims = Depends(get_current_user)) -> UUID:
     """Dependency para garantir que todas as queries tenham tenant_id."""
-    return str(current_user.tenant_id)
+    return current_user.tenant_id
 
 
-async def require_admin_role(current_user: User = Depends(get_current_user)) -> User:
+async def require_admin_role(current_user: UserClaims = Depends(get_current_user)) -> UserClaims:
     """
     Dependency para garantir que apenas admins podem acessar endpoints.
     Levanta HTTPException 403 se usuário não for admin.

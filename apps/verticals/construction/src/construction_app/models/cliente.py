@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Index, String, Text
+from sqlalchemy import Column, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -9,9 +9,8 @@ from construction_app.models.base import BaseModelMixin
 class Cliente(Base, BaseModelMixin):
     __tablename__ = "clientes"
 
-    tenant_id = Column(
-        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    # FK managed by database, not SQLAlchemy (Tenant is in auth service)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     tipo = Column(String(2), nullable=False)  # 'PF' ou 'PJ'
     nome = Column(String(255), nullable=False)
     documento = Column(String(20), nullable=False)  # CPF ou CNPJ
@@ -23,7 +22,6 @@ class Cliente(Base, BaseModelMixin):
     cep = Column(String(10))
     observacoes = Column(Text)
 
-    tenant = relationship("Tenant", backref="clientes")
     obras = relationship("Obra", back_populates="cliente", cascade="all, delete-orphan")
 
     __table_args__ = (

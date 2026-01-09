@@ -5,14 +5,13 @@ from sqlalchemy.orm import Session
 
 from construction_app.application.services.cotacao_service import CotacaoService
 from basecore.db import get_db
-from basecore.deps import get_current_user, get_tenant_id
+from construction_app.core.deps import UserClaims, get_current_user, get_tenant_id
 from construction_app.domain.cotacao.exceptions import (
     CotacaoNaoPodeSerAprovadaException,
     CotacaoNaoPodeSerEditadaException,
     CotacaoNaoPodeSerEnviadaException,
 )
 from construction_app.models.cotacao import Cotacao
-from construction_app.models.user import User
 from construction_app.schemas.cotacao import CotacaoCreate, CotacaoResponse, CotacaoUpdate
 
 router = APIRouter()
@@ -24,13 +23,12 @@ async def list_cotacoes(
     limit: int = Query(100, ge=1, le=1000),
     status_filter: str | None = None,
     cliente_id: UUID | None = None,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Lista cotações do tenant"""
-    tenant_uuid = UUID(tenant_id)
-    query = db.query(Cotacao).filter(Cotacao.tenant_id == tenant_uuid)
+    query = db.query(Cotacao).filter(Cotacao.tenant_id == tenant_id)
 
     if status_filter:
         query = query.filter(Cotacao.status == status_filter)
@@ -45,14 +43,13 @@ async def list_cotacoes(
 @router.get("/{cotacao_id}", response_model=CotacaoResponse)
 async def get_cotacao(
     cotacao_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Busca cotação por ID com itens"""
-    tenant_uuid = UUID(tenant_id)
     cotacao = (
-        db.query(Cotacao).filter(Cotacao.id == cotacao_id, Cotacao.tenant_id == tenant_uuid).first()
+        db.query(Cotacao).filter(Cotacao.id == cotacao_id, Cotacao.tenant_id == tenant_id).first()
     )
 
     if not cotacao:
@@ -64,17 +61,14 @@ async def get_cotacao(
 @router.post("/", response_model=CotacaoResponse, status_code=status.HTTP_201_CREATED)
 async def create_cotacao(
     cotacao_data: CotacaoCreate,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Cria nova cotação"""
     service = CotacaoService(db)
 
     try:
-        # Converte tenant_id de string para UUID
-        tenant_uuid = UUID(tenant_id)
-
         # Converte schema para formato esperado pelo serviço
         itens = [
             {
@@ -89,7 +83,7 @@ async def create_cotacao(
         ]
 
         cotacao = service.criar_cotacao(
-            tenant_id=tenant_uuid,
+            tenant_id=tenant_id,
             cliente_id=cotacao_data.cliente_id,
             usuario_id=current_user.id,
             itens=itens,
@@ -109,17 +103,14 @@ async def create_cotacao(
 async def update_cotacao(
     cotacao_id: UUID,
     cotacao_data: CotacaoUpdate,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Atualiza cotação (apenas se for rascunho)"""
     service = CotacaoService(db)
 
     try:
-        # Converte tenant_id de string para UUID
-        tenant_uuid = UUID(tenant_id)
-
         # Converte schema para formato esperado pelo serviço
         itens = None
         if cotacao_data.itens is not None:
@@ -137,7 +128,7 @@ async def update_cotacao(
 
         cotacao = service.atualizar_cotacao(
             cotacao_id=cotacao_id,
-            tenant_id=tenant_uuid,
+            tenant_id=tenant_id,
             itens=itens,
             desconto_percentual=cotacao_data.desconto_percentual,
             observacoes=cotacao_data.observacoes,
@@ -155,19 +146,15 @@ async def update_cotacao(
 @router.post("/{cotacao_id}/enviar", response_model=CotacaoResponse)
 async def enviar_cotacao(
     cotacao_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Envia cotação (muda status para 'enviada')"""
     service = CotacaoService(db)
 
     try:
-        # Converte tenant_id de string para UUID
-        tenant_uuid = UUID(tenant_id)
-
-        cotacao = service.enviar_cotacao(cotacao_id=cotacao_id, tenant_id=tenant_uuid)
-
+        cotacao = service.enviar_cotacao(cotacao_id=cotacao_id, tenant_id=tenant_id)
         return cotacao
 
     except ValueError as e:
@@ -179,19 +166,15 @@ async def enviar_cotacao(
 @router.post("/{cotacao_id}/aprovar", response_model=CotacaoResponse)
 async def aprovar_cotacao(
     cotacao_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Aprova cotação (muda status para 'aprovada')"""
     service = CotacaoService(db)
 
     try:
-        # Converte tenant_id de string para UUID
-        tenant_uuid = UUID(tenant_id)
-
-        cotacao = service.aprovar_cotacao(cotacao_id=cotacao_id, tenant_id=tenant_uuid)
-
+        cotacao = service.aprovar_cotacao(cotacao_id=cotacao_id, tenant_id=tenant_id)
         return cotacao
 
     except ValueError as e:
@@ -203,19 +186,15 @@ async def aprovar_cotacao(
 @router.post("/{cotacao_id}/cancelar", response_model=CotacaoResponse)
 async def cancelar_cotacao(
     cotacao_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Cancela cotação"""
     service = CotacaoService(db)
 
     try:
-        # Converte tenant_id de string para UUID
-        tenant_uuid = UUID(tenant_id)
-
-        cotacao = service.cancelar_cotacao(cotacao_id=cotacao_id, tenant_id=tenant_uuid)
-
+        cotacao = service.cancelar_cotacao(cotacao_id=cotacao_id, tenant_id=tenant_id)
         return cotacao
 
     except ValueError as e:

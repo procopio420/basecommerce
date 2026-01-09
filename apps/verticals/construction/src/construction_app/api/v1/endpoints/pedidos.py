@@ -5,14 +5,13 @@ from sqlalchemy.orm import Session
 
 from construction_app.application.services.pedido_service import PedidoService
 from basecore.db import get_db
-from basecore.deps import get_current_user, get_tenant_id
+from construction_app.core.deps import UserClaims, get_current_user, get_tenant_id
 from construction_app.domain.pedido.exceptions import (
     CotacaoNaoAprovadaException,
     CotacaoSemItensException,
     PedidoNaoPodeSerCanceladoException,
 )
 from construction_app.models.pedido import Pedido
-from construction_app.models.user import User
 from construction_app.schemas.pedido import PedidoCreate, PedidoResponse, PedidoUpdate
 
 router = APIRouter()
@@ -24,13 +23,12 @@ async def list_pedidos(
     limit: int = Query(100, ge=1, le=1000),
     status_filter: str | None = None,
     cliente_id: UUID | None = None,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Lista pedidos do tenant"""
-    tenant_uuid = UUID(tenant_id)
-    query = db.query(Pedido).filter(Pedido.tenant_id == tenant_uuid)
+    query = db.query(Pedido).filter(Pedido.tenant_id == tenant_id)
 
     if status_filter:
         query = query.filter(Pedido.status == status_filter)
@@ -45,14 +43,13 @@ async def list_pedidos(
 @router.get("/{pedido_id}", response_model=PedidoResponse)
 async def get_pedido(
     pedido_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Busca pedido por ID com itens"""
-    tenant_uuid = UUID(tenant_id)
     pedido = (
-        db.query(Pedido).filter(Pedido.id == pedido_id, Pedido.tenant_id == tenant_uuid).first()
+        db.query(Pedido).filter(Pedido.id == pedido_id, Pedido.tenant_id == tenant_id).first()
     )
 
     if not pedido:
@@ -64,17 +61,14 @@ async def get_pedido(
 @router.post("/", response_model=PedidoResponse, status_code=status.HTTP_201_CREATED)
 async def create_pedido(
     pedido_data: PedidoCreate,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Cria novo pedido diretamente (sem cotação)"""
     service = PedidoService(db)
 
     try:
-        # Converte tenant_id de string para UUID
-        tenant_uuid = UUID(tenant_id)
-
         # Converte schema para formato esperado pelo serviço
         itens = [
             {
@@ -89,7 +83,7 @@ async def create_pedido(
         ]
 
         pedido = service.criar_pedido(
-            tenant_id=tenant_uuid,
+            tenant_id=tenant_id,
             cliente_id=pedido_data.cliente_id,
             usuario_id=current_user.id,
             itens=itens,
@@ -110,9 +104,9 @@ async def create_pedido(
 )
 async def criar_pedido_from_cotacao(
     cotacao_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """
     Converte cotação aprovada em pedido (1 clique).
@@ -121,11 +115,8 @@ async def criar_pedido_from_cotacao(
     service = PedidoService(db)
 
     try:
-        # Converte tenant_id de string para UUID
-        tenant_uuid = UUID(tenant_id)
-
         pedido = service.converter_cotacao_em_pedido(
-            cotacao_id=cotacao_id, tenant_id=tenant_uuid, usuario_id=current_user.id
+            cotacao_id=cotacao_id, tenant_id=tenant_id, usuario_id=current_user.id
         )
 
         return pedido
@@ -142,19 +133,18 @@ async def criar_pedido_from_cotacao(
 async def update_pedido(
     pedido_id: UUID,
     pedido_data: PedidoUpdate,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Atualiza pedido (apenas status e campos permitidos)"""
     service = PedidoService(db)
-    tenant_uuid = UUID(tenant_id)
 
     # Se status foi fornecido, usa o método específico
     if pedido_data.status is not None:
         try:
             pedido = service.atualizar_status_pedido(
-                pedido_id=pedido_id, tenant_id=tenant_uuid, novo_status=pedido_data.status
+                pedido_id=pedido_id, tenant_id=tenant_id, novo_status=pedido_data.status
             )
 
             # Se houver outros campos para atualizar, atualiza diretamente no modelo
@@ -172,7 +162,7 @@ async def update_pedido(
     else:
         # Atualiza apenas campos não críticos
         pedido = (
-            db.query(Pedido).filter(Pedido.id == pedido_id, Pedido.tenant_id == tenant_uuid).first()
+            db.query(Pedido).filter(Pedido.id == pedido_id, Pedido.tenant_id == tenant_id).first()
         )
 
         if not pedido:
@@ -198,19 +188,15 @@ async def update_pedido(
 @router.post("/{pedido_id}/cancelar", response_model=PedidoResponse)
 async def cancelar_pedido(
     pedido_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Cancela pedido"""
     service = PedidoService(db)
 
     try:
-        # Converte tenant_id de string para UUID
-        tenant_uuid = UUID(tenant_id)
-
-        pedido = service.cancelar_pedido(pedido_id=pedido_id, tenant_id=tenant_uuid)
-
+        pedido = service.cancelar_pedido(pedido_id=pedido_id, tenant_id=tenant_id)
         return pedido
 
     except ValueError as e:

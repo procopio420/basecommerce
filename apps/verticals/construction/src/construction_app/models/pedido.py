@@ -9,9 +9,8 @@ from construction_app.models.base import BaseModelMixin
 class Pedido(Base, BaseModelMixin):
     __tablename__ = "pedidos"
 
-    tenant_id = Column(
-        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    # FK managed by database, not SQLAlchemy (Tenant/User are in auth service)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     cotacao_id = Column(UUID(as_uuid=True), ForeignKey("cotacoes.id"))
     cliente_id = Column(UUID(as_uuid=True), ForeignKey("clientes.id"), nullable=False)
     obra_id = Column(UUID(as_uuid=True), ForeignKey("obras.id"))
@@ -21,14 +20,13 @@ class Pedido(Base, BaseModelMixin):
     )  # pendente, em_preparacao, saiu_entrega, entregue, cancelado
     desconto_percentual = Column(Numeric(5, 2), default=0)
     observacoes = Column(Text)
-    usuario_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    # User FK managed by database (User is in auth service)
+    usuario_id = Column(UUID(as_uuid=True), index=True)
     entregue_em = Column(DateTime(timezone=True))
 
-    tenant = relationship("Tenant", backref="pedidos")
     cotacao = relationship("Cotacao")
     cliente = relationship("Cliente")
     obra = relationship("Obra")
-    usuario = relationship("User")
     itens = relationship(
         "PedidoItem",
         back_populates="pedido",
@@ -47,9 +45,8 @@ class Pedido(Base, BaseModelMixin):
 class PedidoItem(Base, BaseModelMixin):
     __tablename__ = "pedido_itens"
 
-    tenant_id = Column(
-        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    # FK managed by database, not SQLAlchemy (Tenant is in auth service)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     pedido_id = Column(
         UUID(as_uuid=True), ForeignKey("pedidos.id", ondelete="CASCADE"), nullable=False
     )
@@ -61,7 +58,6 @@ class PedidoItem(Base, BaseModelMixin):
     observacoes = Column(Text)
     ordem = Column(Integer, default=0)
 
-    tenant = relationship("Tenant", backref="pedido_itens")
     pedido = relationship("Pedido", back_populates="itens")
     produto = relationship("Produto")
 

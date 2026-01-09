@@ -16,9 +16,8 @@ from construction_app.models.base import BaseModelMixin
 class Fornecedor(Base, BaseModelMixin):
     __tablename__ = "fornecedores"
 
-    tenant_id = Column(
-        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    # FK managed by database, not SQLAlchemy (Tenant is in auth service)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     nome = Column(String(255), nullable=False)
     documento = Column(String(20))  # CNPJ
     email = Column(String(255))
@@ -26,7 +25,6 @@ class Fornecedor(Base, BaseModelMixin):
     endereco = Column(Text)
     ativo = Column(Boolean, default=True)
 
-    tenant = relationship("Tenant", backref="fornecedores")
     precos = relationship(
         "FornecedorPreco", back_populates="fornecedor", cascade="all, delete-orphan"
     )
@@ -40,9 +38,8 @@ class Fornecedor(Base, BaseModelMixin):
 class FornecedorPreco(Base, BaseModelMixin):
     __tablename__ = "fornecedor_precos"
 
-    tenant_id = Column(
-        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    # FK managed by database, not SQLAlchemy (Tenant is in auth service)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     fornecedor_id = Column(
         UUID(as_uuid=True), ForeignKey("fornecedores.id", ondelete="CASCADE"), nullable=False
     )
@@ -54,7 +51,6 @@ class FornecedorPreco(Base, BaseModelMixin):
     prazo_pagamento = Column(Numeric(5, 0))  # Dias para pagamento
     valido = Column(Boolean, default=True)  # Preço ainda válido
 
-    tenant = relationship("Tenant", backref="fornecedor_precos")
     fornecedor = relationship("Fornecedor", back_populates="precos")
     produto = relationship("Produto", backref="fornecedor_precos")
 

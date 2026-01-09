@@ -5,9 +5,8 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from basecore.db import get_db
-from basecore.deps import get_current_user, get_tenant_id
+from construction_app.core.deps import UserClaims, get_current_user, get_tenant_id
 from construction_app.models.cliente import Cliente
-from construction_app.models.user import User
 from construction_app.schemas.cliente import ClienteCreate, ClienteResponse, ClienteUpdate
 
 router = APIRouter()
@@ -18,9 +17,9 @@ async def list_clientes(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     search: str | None = None,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Lista clientes do tenant"""
     query = db.query(Cliente).filter(Cliente.tenant_id == tenant_id)
@@ -42,9 +41,9 @@ async def list_clientes(
 @router.get("/{cliente_id}", response_model=ClienteResponse)
 async def get_cliente(
     cliente_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Busca cliente por ID"""
     cliente = (
@@ -60,9 +59,9 @@ async def get_cliente(
 @router.post("/", response_model=ClienteResponse, status_code=status.HTTP_201_CREATED)
 async def create_cliente(
     cliente_data: ClienteCreate,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Cria novo cliente"""
     # Verifica se já existe cliente com mesmo documento no tenant
@@ -90,9 +89,9 @@ async def create_cliente(
 async def update_cliente(
     cliente_id: UUID,
     cliente_data: ClienteUpdate,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Atualiza cliente"""
     cliente = (
@@ -115,9 +114,9 @@ async def update_cliente(
 @router.delete("/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_cliente(
     cliente_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Deleta cliente"""
     cliente = (

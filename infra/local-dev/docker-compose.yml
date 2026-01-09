@@ -126,7 +126,6 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./nginx/tenants:/etc/nginx/tenants:ro
     depends_on:
       construction:
         condition: service_healthy
@@ -141,10 +140,15 @@ services:
       dockerfile: apps/auth/Dockerfile
     container_name: local-auth
     environment:
+      DATABASE_URL: postgresql://basecommerce:localdev123@postgres:5432/basecommerce
       SECRET_KEY: local-dev-secret-key-not-for-production
       ENVIRONMENT: development
+      CORS_ORIGINS: "*"
     expose:
       - "8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 10s

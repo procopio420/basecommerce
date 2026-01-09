@@ -16,15 +16,13 @@ from construction_app.models.base import BaseModelMixin
 class Estoque(Base, BaseModelMixin):
     __tablename__ = "estoque"
 
-    tenant_id = Column(
-        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    # FK managed by database, not SQLAlchemy (Tenant is in auth service)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     produto_id = Column(
         UUID(as_uuid=True), ForeignKey("produtos.id", ondelete="CASCADE"), nullable=False
     )
     quantidade_atual = Column(Numeric(10, 3), nullable=False, default=0)
 
-    tenant = relationship("Tenant", backref="estoque")
     produto = relationship("Produto", backref="estoque")
 
     __table_args__ = (

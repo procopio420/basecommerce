@@ -6,15 +6,9 @@ from construction_app.models.historico_preco import HistoricoPreco
 from construction_app.models.obra import Obra
 from construction_app.models.pedido import Pedido, PedidoItem
 from construction_app.models.produto import Produto
-from construction_app.models.tenant import Tenant
-from construction_app.models.tenant_branding import TenantBranding
-from construction_app.models.user import User
 from construction_app.platform.events.outbox import EventOutbox
 
 __all__ = [
-    "User",
-    "Tenant",
-    "TenantBranding",
     "Cliente",
     "Obra",
     "Produto",

@@ -20,9 +20,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from construction_app.core.deps import get_current_user, get_tenant_id
+from construction_app.core.deps import UserClaims, get_current_user, get_tenant_id
 from basecore.db import get_db
-from construction_app.models.user import User
 
 router = APIRouter()
 
@@ -51,7 +50,7 @@ async def get_stock_alerts(
     product_id: UUID | None = Query(None, description="Filter by product ID"),
     limit: int = Query(50, ge=1, le=200),
     cursor: str | None = Query(None, description="Pagination cursor (created_at ISO timestamp)"),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
     tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -140,7 +139,7 @@ async def get_replenishment_suggestions(
     product_id: UUID | None = Query(None, description="Filter by product ID"),
     limit: int = Query(50, ge=1, le=200),
     cursor: str | None = Query(None, description="Pagination cursor (created_at ISO timestamp)"),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
     tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -224,7 +223,7 @@ async def get_sales_suggestions(
     status: str = Query("active", description="Filter by status"),
     limit: int = Query(50, ge=1, le=200),
     cursor: str | None = Query(None, description="Pagination cursor (created_at ISO timestamp)"),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
     tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -306,7 +305,7 @@ async def get_sales_suggestions(
 async def get_complementary_products(
     product_id: UUID,
     limit: int = Query(10, ge=1, le=50),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
     tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
@@ -357,7 +356,7 @@ async def get_supplier_price_alerts(
     supplier_id: UUID | None = Query(None, description="Filter by supplier ID"),
     limit: int = Query(50, ge=1, le=200),
     cursor: str | None = Query(None, description="Pagination cursor"),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
     tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:

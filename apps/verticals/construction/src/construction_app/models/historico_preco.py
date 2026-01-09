@@ -9,15 +9,13 @@ from construction_app.models.base import BaseModelMixin
 class HistoricoPreco(Base, BaseModelMixin):
     __tablename__ = "historico_precos"
 
-    tenant_id = Column(
-        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    # FK managed by database, not SQLAlchemy (Tenant/User are in auth service)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     produto_id = Column(
         UUID(as_uuid=True), ForeignKey("produtos.id", ondelete="CASCADE"), nullable=False
     )
     preco = Column(Numeric(10, 2), nullable=False)
-    usuario_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    # User FK managed by database (User is in auth service)
+    usuario_id = Column(UUID(as_uuid=True), index=True)
 
-    tenant = relationship("Tenant", backref="historico_precos")
     produto = relationship("Produto", back_populates="historico_precos")
-    usuario = relationship("User")

@@ -1,11 +1,10 @@
 """Web router for server-rendered HTMX pages."""
 
-from datetime import timedelta
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -13,7 +12,6 @@ from sqlalchemy.orm import Session
 from construction_app.application.services.cotacao_service import CotacaoService
 from construction_app.application.services.pedido_service import PedidoService
 from construction_app.core.database import get_db
-from construction_app.core.security import create_access_token, verify_password
 from construction_app.domain.cotacao.exceptions import (
     CotacaoNaoPodeSerAprovadaException,
     CotacaoNaoPodeSerEditadaException,
@@ -26,11 +24,8 @@ from construction_app.domain.pedido.exceptions import (
 )
 from construction_app.models.cotacao import Cotacao
 from construction_app.models.pedido import Pedido
-from construction_app.models.tenant import Tenant
-from construction_app.models.user import User
-from construction_app.web.deps import get_optional_web_user, require_tenant, require_web_user
+from construction_app.web.deps import UserClaims, get_optional_web_user, require_web_user
 from construction_app.web.middleware import DefaultBranding
-from basecore.settings import get_settings
 
 # Setup templates
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -41,100 +36,41 @@ web_router = APIRouter()
 
 def get_template_context(
     request: Request,
-    user: Optional[User] = None,
+    user: Optional[UserClaims] = None,
     **extra_context,
 ) -> dict:
-    """Build common template context with tenant branding."""
-    tenant = getattr(request.state, "tenant", None)
-    branding = getattr(request.state, "tenant_branding", None) or DefaultBranding()
+    """Build common template context with tenant branding.
+    
+    Note: Tenant branding is now fetched client-side via /tenant.json
+    which is served by the auth service.
+    """
+    tenant_slug = getattr(request.state, "tenant_slug", None)
+    branding = DefaultBranding()
     
     return {
         "request": request,
         "user": user,
-        "tenant_name": tenant.nome if tenant else "BaseCommerce",
-        "tenant_slug": getattr(request.state, "tenant_slug", None),
+        "tenant_name": tenant_slug.capitalize() if tenant_slug else "BaseCommerce",
+        "tenant_slug": tenant_slug,
         "branding": branding,
         **extra_context,
     }
 
 
 # =============================================================================
-# Authentication Routes
+# Authentication Routes (redirect to auth service)
 # =============================================================================
 
-@web_router.get("/login", response_class=HTMLResponse)
-async def login_page(
-    request: Request,
-    user: Optional[User] = Depends(get_optional_web_user),
-):
-    """Render login page."""
-    # If already logged in, redirect to dashboard
-    if user:
-        return RedirectResponse(url="/web/dashboard", status_code=302)
-    
-    context = get_template_context(request)
-    return templates.TemplateResponse("pages/login.html", context)
-
-
-@web_router.post("/login")
-async def login_submit(
-    request: Request,
-    email: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db),
-):
-    """Handle login form submission."""
-    settings = get_settings()
-    
-    # Get tenant from request state (subdomain resolution)
-    tenant_id = getattr(request.state, "tenant_id", None)
-    
-    # Build user query
-    query = db.query(User).filter(User.email == email, User.ativo == True)  # noqa: E712
-    
-    if tenant_id:
-        query = query.filter(User.tenant_id == tenant_id)
-    
-    user = query.first()
-    
-    if not user or not verify_password(password, user.password_hash):
-        context = get_template_context(request, error="Email ou senha incorretos")
-        return templates.TemplateResponse(
-            "pages/login.html",
-            context,
-            status_code=401,
-        )
-    
-    # Create access token
-    access_token = create_access_token(
-        data={
-            "sub": str(user.id),
-            "tenant_id": str(user.tenant_id),
-            "email": user.email,
-        },
-        expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
-    
-    # Set cookie and redirect
-    response = RedirectResponse(url="/web/dashboard", status_code=302)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=False,  # Set to True in production with HTTPS
-        samesite="lax",
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
-    
-    return response
+@web_router.get("/login")
+async def login_redirect():
+    """Redirect to auth service login page."""
+    return RedirectResponse(url="/auth/login", status_code=302)
 
 
 @web_router.get("/logout")
-async def logout(request: Request):
-    """Clear auth cookie and redirect to login."""
-    response = RedirectResponse(url="/web/login", status_code=302)
-    response.delete_cookie(key="access_token")
-    return response
+async def logout_redirect():
+    """Redirect to auth service logout."""
+    return RedirectResponse(url="/auth/logout", status_code=302)
 
 
 # =============================================================================
@@ -144,7 +80,7 @@ async def logout(request: Request):
 @web_router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(
     request: Request,
-    user: User = Depends(require_web_user),
+    user: UserClaims = Depends(require_web_user),
     db: Session = Depends(get_db),
 ):
     """Render dashboard page with summary stats."""
@@ -180,7 +116,7 @@ async def dashboard_page(
 @web_router.get("/cotacoes", response_class=HTMLResponse)
 async def cotacoes_list_page(
     request: Request,
-    user: User = Depends(require_web_user),
+    user: UserClaims = Depends(require_web_user),
     db: Session = Depends(get_db),
 ):
     """Render cotações list page."""
@@ -201,7 +137,7 @@ async def cotacoes_list_page(
 @web_router.get("/cotacoes/table", response_class=HTMLResponse)
 async def cotacoes_table_partial(
     request: Request,
-    user: User = Depends(require_web_user),
+    user: UserClaims = Depends(require_web_user),
     db: Session = Depends(get_db),
 ):
     """HTMX partial: return just the cotações table."""
@@ -223,7 +159,7 @@ async def cotacoes_table_partial(
 async def enviar_cotacao(
     request: Request,
     cotacao_id: UUID,
-    user: User = Depends(require_web_user),
+    user: UserClaims = Depends(require_web_user),
     db: Session = Depends(get_db),
 ):
     """Send cotação (change status to 'enviada')."""
@@ -253,7 +189,7 @@ async def enviar_cotacao(
 async def aprovar_cotacao(
     request: Request,
     cotacao_id: UUID,
-    user: User = Depends(require_web_user),
+    user: UserClaims = Depends(require_web_user),
     db: Session = Depends(get_db),
 ):
     """Approve cotação (change status to 'aprovada')."""
@@ -283,7 +219,7 @@ async def aprovar_cotacao(
 async def cancelar_cotacao(
     request: Request,
     cotacao_id: UUID,
-    user: User = Depends(require_web_user),
+    user: UserClaims = Depends(require_web_user),
     db: Session = Depends(get_db),
 ):
     """Cancel cotação."""
@@ -316,7 +252,7 @@ async def cancelar_cotacao(
 @web_router.get("/pedidos", response_class=HTMLResponse)
 async def pedidos_list_page(
     request: Request,
-    user: User = Depends(require_web_user),
+    user: UserClaims = Depends(require_web_user),
     db: Session = Depends(get_db),
 ):
     """Render pedidos list page."""
@@ -337,7 +273,7 @@ async def pedidos_list_page(
 @web_router.get("/pedidos/table", response_class=HTMLResponse)
 async def pedidos_table_partial(
     request: Request,
-    user: User = Depends(require_web_user),
+    user: UserClaims = Depends(require_web_user),
     db: Session = Depends(get_db),
 ):
     """HTMX partial: return just the pedidos table."""
@@ -359,7 +295,7 @@ async def pedidos_table_partial(
 async def criar_pedido_from_cotacao(
     request: Request,
     cotacao_id: UUID,
-    user: User = Depends(require_web_user),
+    user: UserClaims = Depends(require_web_user),
     db: Session = Depends(get_db),
 ):
     """Convert approved cotação to pedido."""
@@ -387,7 +323,7 @@ async def criar_pedido_from_cotacao(
 async def cancelar_pedido(
     request: Request,
     pedido_id: UUID,
-    user: User = Depends(require_web_user),
+    user: UserClaims = Depends(require_web_user),
     db: Session = Depends(get_db),
 ):
     """Cancel pedido."""
@@ -414,42 +350,10 @@ async def cancelar_pedido(
 
 
 # =============================================================================
-# Tenant JSON Endpoint
-# =============================================================================
-
-@web_router.get("/tenant.json")
-async def tenant_json(request: Request):
-    """
-    Return tenant branding as JSON.
-    Convenience endpoint for any client-side needs.
-    """
-    tenant = getattr(request.state, "tenant", None)
-    branding = getattr(request.state, "tenant_branding", None)
-    
-    if not tenant:
-        return {
-            "name": "BaseCommerce",
-            "logo_url": None,
-            "primary_color": "#1a73e8",
-            "secondary_color": "#ea4335",
-            "features": {},
-        }
-    
-    return {
-        "name": tenant.nome,
-        "slug": tenant.slug,
-        "logo_url": branding.logo_url if branding else None,
-        "primary_color": branding.primary_color if branding else "#1a73e8",
-        "secondary_color": branding.secondary_color if branding else "#ea4335",
-        "features": branding.feature_flags if branding else {},
-    }
-
-
-# =============================================================================
 # Helpers
 # =============================================================================
 
-def _flash_error(request: Request, user: User, message: str) -> HTMLResponse:
+def _flash_error(request: Request, user: UserClaims, message: str) -> HTMLResponse:
     """Return a flash error partial."""
     context = get_template_context(
         request,
@@ -458,4 +362,3 @@ def _flash_error(request: Request, user: User, message: str) -> HTMLResponse:
         flash_type="error",
     )
     return templates.TemplateResponse("partials/flash.html", context)
-

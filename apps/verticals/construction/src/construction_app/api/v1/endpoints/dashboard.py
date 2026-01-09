@@ -8,18 +8,17 @@ from sqlalchemy.orm import Session
 
 from construction_app.models.cotacao import Cotacao
 from construction_app.models.pedido import Pedido
-from construction_app.models.user import User
+from construction_app.core.deps import UserClaims, get_current_user, get_tenant_id
 from basecore.db import get_db
-from basecore.deps import get_current_user, get_tenant_id
 
 router = APIRouter()
 
 
 @router.get("/", response_model=dict[str, Any])
 async def get_dashboard(
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """
     Dashboard simples com:
@@ -30,13 +29,10 @@ async def get_dashboard(
     hoje = datetime.utcnow().date()
     inicio_semana = hoje - timedelta(days=hoje.weekday())
 
-    # Converte tenant_id de string para UUID
-    tenant_uuid = UUID(tenant_id)
-    
     # Cotações do dia
     cotacoes_hoje = (
         db.query(func.count(Cotacao.id))
-        .filter(and_(Cotacao.tenant_id == tenant_uuid, func.date(Cotacao.created_at) == hoje))
+        .filter(and_(Cotacao.tenant_id == tenant_id, func.date(Cotacao.created_at) == hoje))
         .scalar()
         or 0
     )
@@ -44,7 +40,7 @@ async def get_dashboard(
     # Pedidos do dia
     pedidos_hoje = (
         db.query(func.count(Pedido.id))
-        .filter(and_(Pedido.tenant_id == tenant_uuid, func.date(Pedido.created_at) == hoje))
+        .filter(and_(Pedido.tenant_id == tenant_id, func.date(Pedido.created_at) == hoje))
         .scalar()
         or 0
     )
@@ -58,7 +54,7 @@ async def get_dashboard(
         db.query(func.count(Pedido.id))
         .filter(
             and_(
-                Pedido.tenant_id == tenant_uuid,
+                Pedido.tenant_id == tenant_id,
                 Pedido.status == "entregue",
                 func.date(Pedido.entregue_em) >= inicio_semana,
             )
@@ -70,7 +66,7 @@ async def get_dashboard(
     # Cotações recentes (últimas 5)
     cotacoes_recentes = (
         db.query(Cotacao)
-        .filter(Cotacao.tenant_id == tenant_uuid)
+        .filter(Cotacao.tenant_id == tenant_id)
         .order_by(Cotacao.created_at.desc())
         .limit(5)
         .all()

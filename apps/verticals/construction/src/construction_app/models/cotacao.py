@@ -9,9 +9,8 @@ from construction_app.models.base import BaseModelMixin
 class Cotacao(Base, BaseModelMixin):
     __tablename__ = "cotacoes"
 
-    tenant_id = Column(
-        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    # FK managed by database, not SQLAlchemy (Tenant/User are in auth service)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     cliente_id = Column(UUID(as_uuid=True), ForeignKey("clientes.id"), nullable=False)
     obra_id = Column(UUID(as_uuid=True), ForeignKey("obras.id"))
     numero = Column(String(50), nullable=False)
@@ -21,15 +20,14 @@ class Cotacao(Base, BaseModelMixin):
     desconto_percentual = Column(Numeric(5, 2), default=0)
     observacoes = Column(Text)
     validade_dias = Column(Integer, default=7)
-    usuario_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    # User FK managed by database (User is in auth service)
+    usuario_id = Column(UUID(as_uuid=True), index=True)
     enviada_em = Column(DateTime(timezone=True))
     aprovada_em = Column(DateTime(timezone=True))
     convertida_em = Column(DateTime(timezone=True))
 
-    tenant = relationship("Tenant", backref="cotacoes")
     cliente = relationship("Cliente")
     obra = relationship("Obra")
-    usuario = relationship("User")
     itens = relationship(
         "CotacaoItem",
         back_populates="cotacao",
@@ -48,9 +46,8 @@ class Cotacao(Base, BaseModelMixin):
 class CotacaoItem(Base, BaseModelMixin):
     __tablename__ = "cotacao_itens"
 
-    tenant_id = Column(
-        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    # FK managed by database, not SQLAlchemy (Tenant is in auth service)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     cotacao_id = Column(
         UUID(as_uuid=True), ForeignKey("cotacoes.id", ondelete="CASCADE"), nullable=False
     )
@@ -62,7 +59,6 @@ class CotacaoItem(Base, BaseModelMixin):
     observacoes = Column(Text)
     ordem = Column(Integer, default=0)
 
-    tenant = relationship("Tenant", backref="cotacao_itens")
     cotacao = relationship("Cotacao", back_populates="itens")
     produto = relationship("Produto")
 

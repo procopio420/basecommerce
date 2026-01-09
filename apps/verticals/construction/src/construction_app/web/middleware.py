@@ -1,23 +1,18 @@
-"""Tenant resolution middleware for subdomain-based multi-tenancy."""
+"""Tenant resolution middleware for subdomain-based multi-tenancy.
+
+The middleware extracts tenant slug from X-Tenant-Slug header (set by Nginx).
+Tenant/branding details are fetched by the frontend via /tenant.json (auth service).
+"""
 
 import logging
 import re
 from typing import Optional
 
 from fastapi import Request
-from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
-from construction_app.core.database import SessionLocal
-from construction_app.models.tenant import Tenant
-from construction_app.models.tenant_branding import TenantBranding
-
 logger = logging.getLogger(__name__)
-
-# Simple in-memory cache for tenant lookups (in production, use Redis)
-_tenant_cache: dict[str, dict] = {}
-_CACHE_TTL_SECONDS = 300  # 5 minutes
 
 
 def get_tenant_slug_from_request(request: Request) -> Optional[str]:
@@ -78,36 +73,18 @@ def extract_slug_from_host(host: str) -> Optional[str]:
     return None
 
 
-def get_tenant_by_slug(db: Session, slug: str) -> Optional[Tenant]:
-    """Fetch tenant by slug from database."""
-    return (
-        db.query(Tenant)
-        .filter(Tenant.slug == slug, Tenant.ativo == True)  # noqa: E712
-        .first()
-    )
-
-
-def get_tenant_branding(db: Session, tenant_id) -> Optional[TenantBranding]:
-    """Fetch tenant branding from database."""
-    return (
-        db.query(TenantBranding)
-        .filter(TenantBranding.tenant_id == tenant_id)
-        .first()
-    )
-
-
 class TenantResolutionMiddleware(BaseHTTPMiddleware):
     """
-    Middleware that resolves tenant from X-Tenant-Slug header or Host header.
+    Middleware that resolves tenant slug from X-Tenant-Slug header or Host header.
     
     In production, Nginx injects the X-Tenant-Slug header based on subdomain.
     In development, the middleware parses the Host header directly.
     
+    Note: Tenant details (branding, features) are fetched via /tenant.json
+    which is served by the auth service. This middleware only extracts the slug.
+    
     Sets request.state attributes:
-    - tenant_id: UUID of the resolved tenant
     - tenant_slug: slug extracted from header/host
-    - tenant: Tenant model instance
-    - tenant_branding: TenantBranding model instance (or defaults)
     """
 
     # Paths that don't require tenant resolution
@@ -132,31 +109,11 @@ class TenantResolutionMiddleware(BaseHTTPMiddleware):
         # Get tenant slug from header or host
         slug = get_tenant_slug_from_request(request)
         
-        # Initialize tenant state with defaults
-        request.state.tenant_id = None
+        # Set tenant slug in request state
         request.state.tenant_slug = slug
-        request.state.tenant = None
-        request.state.tenant_branding = None
         
         if slug:
-            db: Session = SessionLocal()
-            try:
-                tenant = get_tenant_by_slug(db, slug)
-                if tenant:
-                    branding = get_tenant_branding(db, tenant.id)
-                    
-                    request.state.tenant_id = tenant.id
-                    request.state.tenant = tenant
-                    request.state.tenant_branding = branding
-                    
-                    logger.debug(
-                        f"Resolved tenant: {tenant.nome} (slug={slug})",
-                        extra={"tenant_id": str(tenant.id), "slug": slug},
-                    )
-                else:
-                    logger.warning(f"Tenant not found for slug: {slug}")
-            finally:
-                db.close()
+            logger.debug(f"Tenant slug resolved: {slug}")
         
         response = await call_next(request)
         return response

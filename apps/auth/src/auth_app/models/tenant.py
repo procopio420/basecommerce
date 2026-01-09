@@ -2,10 +2,12 @@ from sqlalchemy import Boolean, Column, String, Text
 from sqlalchemy.orm import relationship
 
 from basecore.db import Base
-from construction_app.models.base import BaseModelMixin
+from auth_app.models.base import BaseModelMixin
 
 
 class Tenant(Base, BaseModelMixin):
+    """Tenant model - represents a customer organization."""
+
     __tablename__ = "tenants"
 
     nome = Column(String(255), nullable=False)
@@ -18,3 +20,5 @@ class Tenant(Base, BaseModelMixin):
 
     # Relationship to branding
     branding = relationship("TenantBranding", back_populates="tenant", uselist=False)
+    users = relationship("User", back_populates="tenant")
+

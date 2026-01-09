@@ -4,6 +4,8 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
     curl \
+    libpq-dev \
+    gcc \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy basecore package
@@ -16,7 +18,15 @@ COPY apps/auth/src /app/src
 RUN pip install --no-cache-dir -e /app/packages/basecore
 
 # Install additional dependencies
-RUN pip install --no-cache-dir fastapi uvicorn[standard] pydantic-settings
+RUN pip install --no-cache-dir \
+    fastapi \
+    uvicorn[standard] \
+    pydantic-settings \
+    pydantic[email] \
+    sqlalchemy \
+    psycopg2-binary \
+    jinja2 \
+    python-multipart
 
 # Set PYTHONPATH
 ENV PYTHONPATH=/app/src

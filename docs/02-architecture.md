@@ -13,23 +13,24 @@ Plataforma SaaS multi-tenant e multi-vertical para comercio. Cada vertical (ex: 
 │         *.basecommerce.com.br → X-Tenant-Slug header             │
 └────────────────────────────┬────────────────────────────────────┘
                              │ HTTP
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Verticals Layer                               │
-│                                                                  │
-│   ┌────────────────────────────────────────────────────────┐   │
-│   │         Construction Vertical (FastAPI)                 │   │
-│   │  ┌─────────────┐  ┌─────────────┐                      │   │
-│   │  │  REST API   │  │  HTMX Web   │                      │   │
-│   │  │  /api/v1/*  │  │  /web/*     │                      │   │
-│   │  └─────────────┘  └─────────────┘                      │   │
-│   │  ┌─────────────────────────────────────────────────┐   │   │
-│   │  │ Domain / Application / Models / Schemas         │   │   │
-│   │  └─────────────────────────────────────────────────┘   │   │
-│   └────────────────────────────────────────────────────────┘   │
-│                                                                  │
-│   (Futuras verticais: alimentacao, varejo, etc.)                 │
-└────────────────────────────┬────────────────────────────────────┘
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+┌──────────────────────┐     ┌──────────────────────────────────────┐
+│    Auth Service      │     │           Verticals Layer            │
+│    (FastAPI :8001)   │     │                                      │
+│                      │     │   ┌──────────────────────────────┐   │
+│  - /auth/login       │     │   │  Construction Vertical       │   │
+│  - /auth/logout      │     │   │  (FastAPI :8000)              │   │
+│  - /auth/me          │     │   │                              │   │
+│  - /tenant.json      │     │   │  - /api/v1/* (REST)          │   │
+│                      │     │   │  - /web/*    (HTMX)          │   │
+│  Owns:               │     │   └──────────────────────────────┘   │
+│  - Tenant model      │     │                                      │
+│  - User model        │     │   Uses: UserClaims from JWT          │
+│  - TenantBranding    │     │   (no User/Tenant models)            │
+└──────────────────────┘     └──────────────────────────────────────┘
+              │                             │
+              └──────────────┬──────────────┘
                              │ Events (Outbox Pattern)
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
@@ -66,10 +67,49 @@ Plataforma SaaS multi-tenant e multi-vertical para comercio. Cada vertical (ex: 
 │                      PostgreSQL                                  │
 │                 (Multi-tenant por tenant_id)                     │
 │                                                                  │
+│   - Tabelas de auth (tenants, users, tenant_branding)           │
 │   - Tabelas de verticais (cotacoes, pedidos, etc.)              │
 │   - Tabelas de engines (engine_*, sugestoes, alertas)            │
 │   - Event outbox para Outbox Pattern                             │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+## Auth Service
+
+O Auth Service e centralizado e responsavel por:
+
+- **Autenticacao**: Login/logout via JWT
+- **Tenant Resolution**: Endpoint `/tenant.json` retorna branding do tenant
+- **User Management**: Modelos Tenant, User, TenantBranding
+
+### Endpoints
+
+| Endpoint | Metodo | Descricao |
+|----------|--------|-----------|
+| `/auth/login` | GET | Pagina de login (HTML) |
+| `/auth/login` | POST | Login JSON, retorna JWT |
+| `/auth/login/form` | POST | Login form, set cookie |
+| `/auth/logout` | GET | Clear cookie, redirect |
+| `/auth/me` | GET | User info (Bearer/cookie) |
+| `/tenant.json` | GET | Branding (via X-Tenant-Slug) |
+| `/auth/validate` | GET | Valida token |
+
+### Fluxo de Login
+
+```
+1. Usuario acessa /web/dashboard
+2. Nginx redireciona /web/login → /auth/login
+3. Auth Service renderiza pagina de login
+4. Usuario submete form para /auth/login/form
+5. Auth Service valida credenciais
+6. Auth Service cria JWT com claims:
+   - sub: user_id
+   - tenant_id: tenant_id
+   - email: user_email
+   - role: user_role
+7. Auth Service seta cookie httponly
+8. Redirect para /web/dashboard
+9. Vertical extrai claims do JWT (sem query ao banco)
 ```
 
 ## Principais Entidades
@@ -78,6 +118,12 @@ Plataforma SaaS multi-tenant e multi-vertical para comercio. Cada vertical (ex: 
 - Representa uma loja ou empresa cliente
 - Cada tenant tem isolamento completo de dados
 - Resolvido via subdomain (ex: `loja.basecommerce.com.br`)
+- **Gerenciado pelo Auth Service**
+
+### User
+- Usuario dentro de um tenant
+- Roles: admin, vendedor
+- **Gerenciado pelo Auth Service**
 
 ### Cliente
 - PF (Pessoa Fisica) ou PJ (Pessoa Juridica)
@@ -126,12 +172,13 @@ Plataforma SaaS multi-tenant e multi-vertical para comercio. Cada vertical (ex: 
 
 ## Multi-tenant
 
-**Estrategia**: Subdomain + Tenant ID em todas as tabelas + Middleware
+**Estrategia**: Subdomain + JWT Claims + Middleware
 
 - Nginx resolve subdomain e injeta `X-Tenant-Slug` header
-- Middleware resolve tenant do header ou Host
+- Auth Service resolve tenant do header e gera JWT
+- JWT contem `tenant_id` nos claims
+- Vertical extrai `tenant_id` do JWT (sem query ao banco)
 - Todas as queries sao filtradas por `tenant_id`
-- Isolamento garantido no nivel da aplicacao
 
 ## Event-Driven Architecture
 
@@ -144,8 +191,9 @@ Plataforma SaaS multi-tenant e multi-vertical para comercio. Cada vertical (ex: 
 
 ## Seguranca
 
-- JWT para autenticacao
-- Tenant isolation obrigatorio
+- JWT para autenticacao (criado pelo Auth Service)
+- Tenant isolation via JWT claims
 - Validacao de dados em todas as entradas
 - Cookies HttpOnly para web
 - HTTPS em producao
+- Auth Service centraliza gestao de usuarios

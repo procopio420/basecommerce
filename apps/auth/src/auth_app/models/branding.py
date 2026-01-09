@@ -3,7 +3,7 @@ from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import relationship
 
 from basecore.db import Base
-from construction_app.models.base import BaseModelMixin
+from auth_app.models.base import BaseModelMixin
 
 
 class TenantBranding(Base, BaseModelMixin):

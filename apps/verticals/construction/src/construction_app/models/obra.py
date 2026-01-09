@@ -9,9 +9,8 @@ from construction_app.models.base import BaseModelMixin
 class Obra(Base, BaseModelMixin):
     __tablename__ = "obras"
 
-    tenant_id = Column(
-        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
+    # FK managed by database, not SQLAlchemy (Tenant is in auth service)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     cliente_id = Column(
         UUID(as_uuid=True), ForeignKey("clientes.id", ondelete="CASCADE"), nullable=False
     )
@@ -22,5 +21,4 @@ class Obra(Base, BaseModelMixin):
     observacoes = Column(Text)
     ativa = Column(Boolean, default=True)
 
-    tenant = relationship("Tenant", backref="obras")
     cliente = relationship("Cliente", back_populates="obras")

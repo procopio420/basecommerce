@@ -4,10 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from basecore.db import get_db
-from basecore.deps import get_current_user, get_tenant_id
+from construction_app.core.deps import UserClaims, get_current_user, get_tenant_id
 from construction_app.models.cliente import Cliente
 from construction_app.models.obra import Obra
-from construction_app.models.user import User
 from construction_app.schemas.obra import ObraCreate, ObraResponse, ObraUpdate
 
 router = APIRouter()
@@ -18,9 +17,9 @@ async def list_obras(
     cliente_id: UUID | None = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Lista obras do tenant"""
     query = db.query(Obra).filter(Obra.tenant_id == tenant_id)
@@ -35,9 +34,9 @@ async def list_obras(
 @router.get("/{obra_id}", response_model=ObraResponse)
 async def get_obra(
     obra_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Busca obra por ID"""
     obra = db.query(Obra).filter(Obra.id == obra_id, Obra.tenant_id == tenant_id).first()
@@ -51,9 +50,9 @@ async def get_obra(
 @router.post("/", response_model=ObraResponse, status_code=status.HTTP_201_CREATED)
 async def create_obra(
     obra_data: ObraCreate,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Cria nova obra"""
     # Verifica se cliente existe e pertence ao tenant
@@ -79,9 +78,9 @@ async def create_obra(
 async def update_obra(
     obra_id: UUID,
     obra_data: ObraUpdate,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Atualiza obra"""
     obra = db.query(Obra).filter(Obra.id == obra_id, Obra.tenant_id == tenant_id).first()
@@ -102,9 +101,9 @@ async def update_obra(
 @router.delete("/{obra_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_obra(
     obra_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Deleta obra"""
     obra = db.query(Obra).filter(Obra.id == obra_id, Obra.tenant_id == tenant_id).first()

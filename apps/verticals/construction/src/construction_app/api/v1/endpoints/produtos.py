@@ -5,9 +5,8 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from basecore.db import get_db
-from basecore.deps import get_current_user, get_tenant_id
+from construction_app.core.deps import UserClaims, get_current_user, get_tenant_id
 from construction_app.models.produto import Produto
-from construction_app.models.user import User
 from construction_app.schemas.produto import ProdutoCreate, ProdutoResponse, ProdutoUpdate
 
 router = APIRouter()
@@ -19,9 +18,9 @@ async def list_produtos(
     limit: int = Query(100, ge=1, le=1000),
     search: str | None = None,
     ativo: bool | None = None,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Lista produtos do tenant"""
     query = db.query(Produto).filter(Produto.tenant_id == tenant_id)
@@ -46,9 +45,9 @@ async def list_produtos(
 @router.get("/{produto_id}", response_model=ProdutoResponse)
 async def get_produto(
     produto_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Busca produto por ID"""
     produto = (
@@ -64,9 +63,9 @@ async def get_produto(
 @router.post("/", response_model=ProdutoResponse, status_code=status.HTTP_201_CREATED)
 async def create_produto(
     produto_data: ProdutoCreate,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Cria novo produto"""
     # Se código fornecido, verifica se já existe no tenant
@@ -95,9 +94,9 @@ async def create_produto(
 async def update_produto(
     produto_id: UUID,
     produto_data: ProdutoUpdate,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Atualiza produto"""
     produto = (
@@ -138,9 +137,9 @@ async def update_produto(
 @router.delete("/{produto_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_produto(
     produto_id: UUID,
-    tenant_id: str = Depends(get_tenant_id),
+    tenant_id: UUID = Depends(get_tenant_id),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: UserClaims = Depends(get_current_user),
 ):
     """Deleta produto (soft delete - marca como inativo)"""
     produto = (
