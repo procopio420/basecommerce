@@ -22,7 +22,9 @@
                     </div>
                     <div>
                         <dt class="text-xs text-gray-500">Status</dt>
-                        <dd>{% include "partials/badge.html" with text=pedido.status|replace('_', ' ')|title, variant=pedido.status %}</dd>
+                        <dd>{% set text = pedido.status|replace('_', ' ')|title %}
+                        {% set variant = pedido.status %}
+                        {% include "partials/badge.html" %}</dd>
                     </div>
                     <div>
                         <dt class="text-xs text-gray-500">Cliente</dt>

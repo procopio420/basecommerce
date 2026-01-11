@@ -13,15 +13,16 @@
      BLOCO 1: ALERTAS DO DIA
      ============================================================================= -->
 <section class="mb-8">
-    {% include "partials/section_header.html" with title="Alertas do Dia" %}
+    {% set title = "Alertas do Dia" %}
+    {% include "partials/section_header.html" %}
     <div id="alerts-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% if alerts %}
         {% for alert in alerts %}
-            {% include "partials/alert_item.html" with alert=alert %}
+            {% include "partials/alert_item.html" %}
         {% endfor %}
         {% else %}
-        {% set empty_alert = {"severity": "info", "title": "Tudo certo!", "message": "Nenhum alerta crítico no momento. Seu estoque e preços estão dentro do esperado."} %}
-        {% include "partials/alert_item.html" with alert=empty_alert %}
+        {% set alert = {"severity": "info", "title": "Tudo certo!", "message": "Nenhum alerta crítico no momento. Seu estoque e preços estão dentro do esperado."} %}
+        {% include "partials/alert_item.html" %}
         {% endif %}
     </div>
 </section>
@@ -30,19 +31,40 @@
      BLOCO 2: AÇÕES RECOMENDADAS / ATALHOS RÁPIDOS
      ============================================================================= -->
 <section class="mb-8">
-    {% include "partials/section_header.html" with title="Atalhos Rápidos" %}
+    {% set title = "Atalhos Rápidos" %}
+    {% include "partials/section_header.html" %}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {% set icon_doc = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>' %}
-        {% include "partials/quick_action.html" with title="Criar novo orçamento", description="Crie um orçamento para sua obra ou cliente", href="/web/cotacoes/new", icon=icon_doc, variant="primary" %}
+        {% set title = "Criar novo orçamento" %}
+        {% set description = "Crie um orçamento para sua obra ou cliente" %}
+        {% set href = "/web/cotacoes/new" %}
+        {% set icon = icon_doc %}
+        {% set variant = "primary" %}
+        {% include "partials/quick_action.html" %}
         
         {% set icon_cart = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>' %}
-        {% include "partials/quick_action.html" with title="Novo pedido", description="Criar pedido a partir de cotação aprovada", href="/web/pedidos/new", icon=icon_cart, variant="secondary" %}
+        {% set title = "Novo pedido" %}
+        {% set description = "Criar pedido a partir de cotação aprovada" %}
+        {% set href = "/web/pedidos/new" %}
+        {% set icon = icon_cart %}
+        {% set variant = "secondary" %}
+        {% include "partials/quick_action.html" %}
         
         {% set icon_box = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>' %}
-        {% include "partials/quick_action.html" with title="Registrar estoque", description="Registrar entrada de materiais", href="/web/estoque/entrada", icon=icon_box, variant="success" %}
+        {% set title = "Registrar estoque" %}
+        {% set description = "Registrar entrada de materiais" %}
+        {% set href = "/web/estoque/entrada" %}
+        {% set icon = icon_box %}
+        {% set variant = "success" %}
+        {% include "partials/quick_action.html" %}
         
         {% set icon_chart = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>' %}
-        {% include "partials/quick_action.html" with title="Ver insights", description="Análises e recomendações", href="/web/insights", icon=icon_chart, variant="warning" %}
+        {% set title = "Ver insights" %}
+        {% set description = "Análises e recomendações" %}
+        {% set href = "/web/insights" %}
+        {% set icon = icon_chart %}
+        {% set variant = "warning" %}
+        {% include "partials/quick_action.html" %}
     </div>
 </section>
 
@@ -50,10 +72,15 @@
      BLOCO 3: VISÃO RÁPIDA DO NEGÓCIO
      ============================================================================= -->
 <section class="mb-8">
-    {% include "partials/section_header.html" with title="Visão Rápida do Negócio" %}
+    {% set title = "Visão Rápida do Negócio" %}
+    {% include "partials/section_header.html" %}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
         {% set icon_money = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>' %}
-        {% include "partials/stat_card.html" with label="Vendas da Semana", value=business_overview.week_sales.formatted|default("R$ 0,00"), description="Pedidos entregues esta semana", icon=icon_money %}
+        {% set label = "Vendas da Semana" %}
+        {% set value = business_overview.week_sales.formatted|default("R$ 0,00") %}
+        {% set description = "Pedidos entregues esta semana" %}
+        {% set icon = icon_money %}
+        {% include "partials/stat_card.html" %}
         
         {% set icon_doc = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>' %}
         {% set orcamentos_por_status = business_overview.active_quotations.por_status|default({}) %}
@@ -66,10 +93,18 @@
         {% else %}
             {% set orcamentos_text = "Nenhum orçamento em andamento" %}
         {% endif %}
-        {% include "partials/stat_card.html" with label="Orçamentos Ativos", value=business_overview.active_quotations.total|default(0)|string, description=orcamentos_text, icon=icon_doc %}
+        {% set label = "Orçamentos Ativos" %}
+        {% set value = business_overview.active_quotations.total|default(0)|string %}
+        {% set description = orcamentos_text %}
+        {% set icon = icon_doc %}
+        {% include "partials/stat_card.html" %}
         
         {% set icon_box = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>' %}
-        {% include "partials/stat_card.html" with label="Materiais Mais Movimentados", value=business_overview.top_products|length|string, description="Últimos 30 dias", icon=icon_box %}
+        {% set label = "Materiais Mais Movimentados" %}
+        {% set value = business_overview.top_products|length|string %}
+        {% set description = "Últimos 30 dias" %}
+        {% set icon = icon_box %}
+        {% include "partials/stat_card.html" %}
     </div>
 
     {% if business_overview.top_products %}
@@ -96,7 +131,8 @@
      BLOCO 4: FOCO EM MATERIAL DE CONSTRUÇÃO
      ============================================================================= -->
 <section class="mb-8">
-    {% include "partials/section_header.html" with title="Materiais de Construção" %}
+    {% set title = "Materiais de Construção" %}
+    {% include "partials/section_header.html" %}
     
     {% if construction_materials.top_selling %}
     <div class="bg-white rounded-lg border border-gray-200 p-6 mb-6">

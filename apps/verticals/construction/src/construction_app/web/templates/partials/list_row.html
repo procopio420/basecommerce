@@ -23,7 +23,9 @@
                         <p class="text-sm {% if col.bold %}font-semibold{% endif %} text-gray-900">
                             {% if col.field %}
                                 {% if col.type == "badge" %}
-                                    {% include "partials/badge.html" with text=item[col.field], variant=item.get(col.variant_field, "default") %}
+                                    {% set text = item[col.field] %}
+                                    {% set variant = item.get(col.variant_field, "default") %}
+                                    {% include "partials/badge.html" %}
                                 {% elif col.type == "currency" %}
                                     R$ {{ "%.2f"|format(item[col.field]|default(0)) }}
                                 {% elif col.type == "date" %}

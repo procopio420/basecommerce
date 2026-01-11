@@ -36,7 +36,9 @@
                         <span class="text-sm font-medium text-gray-900">R$ {{ "%.2f"|format(pedido.valor_total or 0) }}</span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        {% include "partials/badge.html" with text=pedido.status|replace('_', ' ')|title, variant=pedido.status %}
+                        {% set text = pedido.status|replace('_', ' ')|title %}
+                        {% set variant = pedido.status %}
+                        {% include "partials/badge.html" %}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {{ pedido.created_at.strftime('%d/%m/%Y %H:%M') }}
@@ -64,8 +66,13 @@
     </div>
 </div>
 {% if total_pages and total_pages > 1 %}
-{% include "partials/pagination_offset.html" with target_id="pedidos-table" url_path="/web/pedidos/table" %}
+{% set target_id = "pedidos-table" url_path="/web/pedidos/table" %}
+{% include "partials/pagination_offset.html" %}
 {% endif %}
 {% else %}
-{% include "partials/empty_state.html" with title="Nenhum pedido encontrado", message="Ainda não há pedidos registrados.", cta_text="Ver cotações", cta_href="/web/cotacoes" %}
+{% set title = "Nenhum pedido encontrado" %}
+{% set message = "Ainda não há pedidos registrados." %}
+{% set cta_text = "Ver cotações" %}
+{% set cta_href = "/web/cotacoes" %}
+{% include "partials/empty_state.html" %}
 {% endif %}
